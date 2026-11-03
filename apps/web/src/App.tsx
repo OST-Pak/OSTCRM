@@ -6,6 +6,7 @@ import { Ctx, useApp, type AppContext } from "./context.js";
 import { ErrorBoundary } from "./layout/ErrorBoundary.js";
 import { Header } from "./layout/Header.js";
 import { NotPorted, SCREENS } from "./views/index.js";
+import { DrawerHost } from "./views/CompanyDrawer.js";
 
 const isView = (v: string): v is ViewId => VIEWS.some(x => x.id === v);
 
@@ -19,6 +20,7 @@ function Shell() {
       <main className="wrap">
         <ErrorBoundary api={api} resetKey={current ?? ""}>
           <Outlet />
+          <DrawerHost />
         </ErrorBoundary>
       </main>
     </>
@@ -39,6 +41,8 @@ export function buildRouter(ctx: AppContext) {
   });
   const view = createRoute({
     getParentRoute: () => root, path: "/$view", component: Screen,
+    // `?co=<company id>` opens the company drawer over any screen.
+    validateSearch: (s: Record<string, unknown>): { co?: string } => (typeof s.co === "string" && /^([0-9a-f-]{36}|new)$/.test(s.co) ? { co: s.co } : {}),
     // Screens a role cannot see send it to its home screen. The API enforces access regardless.
     beforeLoad: ({ params }) => {
       if (!isView(params.view) || !canSeeView(ctx.me.role, params.view)) throw redirect({ to: "/$view", params: { view: homeView(ctx.me.role) } });

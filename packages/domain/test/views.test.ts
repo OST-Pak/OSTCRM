@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { VIEWS, canSeeView, homeView, pushLine, viewsFor } from "../src/index.js";
+import { VIEWS, canSeeView, drawerAbilities, homeView, pushLine, viewsFor } from "../src/index.js";
 
 describe("screens by role", () => {
   it("owner and admin see all 14 screens", () => {
@@ -38,5 +38,14 @@ describe("push line", () => {
     expect(pushLine("2026-10-28")).toBe("Starts Oct 29, 2026");
     expect(pushLine("2026-12-12")).toBe("Day 45 of 60, Dec 11 deadline passed");
     expect(pushLine("2027-01-15")).toBe("Day 60 of 60, Dec 11 deadline passed");
+  });
+});
+
+describe("drawerAbilities", () => {
+  it("matches the API: Specialists work their own deals, Read only changes nothing", () => {
+    expect(drawerAbilities("bd_support", false)).toEqual({ editCompany: true, editDeal: true, logActivity: true, manageTasks: true, editContacts: true, addProspect: true, archive: true });
+    expect(drawerAbilities("specialist", false).editDeal).toBe(false);
+    expect(drawerAbilities("specialist", true)).toMatchObject({ editDeal: true, editCompany: false, editContacts: false, logActivity: true });
+    expect(Object.values(drawerAbilities("read_only", true)).some(Boolean)).toBe(false);
   });
 });

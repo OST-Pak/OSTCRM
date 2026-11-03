@@ -19,6 +19,12 @@ Every rule in the "Business rules registry" of **Oak Street BD CRM: Build Instru
 | Pace plan | Meetings 2/8/20, proposals 10, signed 3 by Dec 11 and 4 by Dec 27 | `DEFAULT_PLAN`, `planAt`, `paceStatus` | `pace.test.ts` |
 | Proposals | Versioned; sent version locked; revision after sending is a new proposal | `canAddProposalVersion`, `proposal_versions` guard | `registry.test.ts`, db `rules.test.ts` |
 | Import duplicates | Contacts by email; companies by domain plus normalized name | `importMatcher` | `registry.test.ts` |
+| Activity effects | Auto-advance, first proposal date, next step carried; open deal needs a next step not in the past | `activityEffect` | `deal.test.ts`, api `company.test.ts` |
+| Stage dates on save | Stage date stamped on change; signed date set once, cleared if moved back | `stageDatesOnSave` | `deal.test.ts`, api `company.test.ts` |
+| Cadence | Steps per stage, due from the stage date; ticks per stage; Proposal step done by sending | `cadenceFor`, `cadenceTick` | `cadence.test.ts`, `pipeline.test.ts`, api `board.test.ts` |
+| Documents due | Proposal 2 days after discovery; contract 1 day after verbal yes; signature 3 days after the contract; decision 5 days after the proposal | `documentDue`, `documentsDue`, `signatureDueAfter` | `cadence.test.ts`, `pipeline.test.ts`, api `board.test.ts` |
+| Pipeline board | Open and signed deals by stage, sorted by next step due; value at founding prices | `pipelineBoard` | `pipeline.test.ts`, api `board.test.ts` |
+| Tiers | Score, rank; top 40 A, next 160 B; partners, clients, unfit, closed and duplicates excluded | `tierScore`, `assignTiers`, `rankProspects` | `accounts.test.ts`, `prospects.test.ts`, api `api.test.ts` |
 
 Rules the doc describes elsewhere, also covered:
 

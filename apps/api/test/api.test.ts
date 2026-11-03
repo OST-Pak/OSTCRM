@@ -68,7 +68,7 @@ describe("permissions", () => {
   const writes = async (who: Who) => {
     const h = { ...(await T.auth(who)), ...key() };
     return [
-      (await T.app.inject({ method: "POST", url: "/v1/activities", headers: h, payload: { companyId: acme.id, type: "Call", occurredOn: "2026-11-10" } })).statusCode,
+      (await T.app.inject({ method: "POST", url: "/v1/activities", headers: h, payload: { companyId: acme.id, type: "Call", occurredOn: "2026-11-10", nextStep: "Call back", nextStepOn: "2099-01-01" } })).statusCode,
       (await T.app.inject({ method: "PATCH", url: `/v1/companies/${acme.id}`, headers: h, payload: { version: 999, state: "Ohio" } })).statusCode,
       (await T.app.inject({ url: "/v1/exports/companies.csv", headers: h })).statusCode,
       (await T.app.inject({ method: "POST", url: `/v1/users/${T.people.read_only.id}/role`, headers: { ...h, ...key() }, payload: { role: "specialist", reason: "test" } })).statusCode
@@ -153,7 +153,7 @@ describe("concurrent edits", () => {
 describe("commands", () => {
   it("a double click or retry never creates two activities", async () => {
     const h = { ...(await T.auth("bd_support")), ...key() };
-    const body = { companyId: acme.id, type: "Email", direction: "Outbound", occurredOn: "2026-11-11", summary: "Follow-up" };
+    const body = { companyId: acme.id, type: "Email", direction: "Outbound", occurredOn: "2026-11-11", summary: "Follow-up", nextStep: "Chase", nextStepOn: "2099-01-01" };
     const [a, b] = await Promise.all([1, 2].map(() => T.app.inject({ method: "POST", url: "/v1/activities", headers: h, payload: body })));
     expect([a!.statusCode, b!.statusCode]).toEqual([201, 201]);
     expect(a!.json().id).toBe(b!.json().id);
