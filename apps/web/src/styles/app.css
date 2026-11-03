@@ -1,0 +1,4 @@
+/* Additions for the hosted app only. Everything else comes from crm.css, unchanged from the artifact. */
+main.wrap { padding-top: 16px; padding-bottom: 48px; }
+.me .small { font-size: var(--s-xs); }
+@media (max-width: 820px) { .me .small { display: none; } }

@@ -10,3 +10,4 @@ export * from "./cadence.js";
 export * from "./accounts.js";
 export * from "./proposal.js";
 export * from "./registry.js";
+export * from "./views.js";
