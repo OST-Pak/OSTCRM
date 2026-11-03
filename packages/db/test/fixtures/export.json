@@ -1,0 +1,77 @@
+{
+  "format": "oak-street-crm-export",
+  "formatVersion": 1,
+  "exportedAt": "2027-01-06T15:00:00.000Z",
+  "exportedBy": "u_owner",
+  "collections": {
+    "members": [
+      {"id": "u_owner", "member": "Saad", "claimedAt": "2026-10-29T10:00:00Z"},
+      {"id": "u_bd", "member": "Awais", "claimedAt": "2026-10-29T11:00:00Z"},
+      {"id": "u_ghost", "member": "Ammar", "claimedAt": "2026-10-30T11:00:00Z"}
+    ],
+    "access": [{"id": "u_bd", "role": "BD support", "at": "2026-11-02"}],
+    "platforms": [{"id": "p1", "name": "PrismHR"}, {"id": "p2", "name": "isolved", "enwageCompatible": true}],
+    "companies": [
+      {"id": "c_acme", "name": "Acme PEO, LLC", "website": "https://www.acmepeo.example", "domain": "acmepeo.example", "type": "PEO", "channel": "Cold email",
+       "stage": "Proposal sent", "stageChangedAt": "2026-11-20", "owner": "Saad", "staffSeats": 2, "managerSeats": 1, "nextStep": "Decision call", "nextStepDate": "2026-11-27",
+       "proposalSentDate": "2026-11-20", "decisionDate": "2026-11-25", "economicBuyerId": "k_ceo", "cad": {"stage": "Proposal sent", "done": [0, 1]},
+       "naics": ["561330"], "notes": "Met at a conference", "createdAt": "2026-10-29T12:00:00Z", "byUid": "u_owner", "cov": {"eb": 1}},
+      {"id": "c_beta", "name": "Beta Payroll", "website": "betapayroll.example", "type": "Payroll only", "stage": "Target", "owner": "Awais", "createdAt": "2026-10-29T12:01:00Z", "byUid": "u_bd"},
+      {"id": "c_beta_dup", "name": "Beta Payroll Inc", "domain": "betapayroll.example", "stage": "Target", "createdAt": "2026-10-30T12:00:00Z"},
+      {"id": "c_clash", "name": "Gamma HR", "domain": "acmepeo.example", "stage": "Target", "createdAt": "2026-10-31T12:00:00Z"},
+      {"id": "c_signed", "name": "Delta Staffing", "domain": "delta.example", "type": "PEO", "stage": "Signed", "signedAt": "2026-12-05", "owner": "Nobody", "staffSeats": 3, "createdAt": "2026-10-29T12:02:00Z"},
+      {"id": "c_odd", "name": "Epsilon", "stage": "Hot lead", "createdAt": "2026-10-29T12:03:00Z"},
+      {"id": "c_noname", "name": "  ", "stage": "Target"}
+    ],
+    "contacts": [
+      {"id": "k_ceo", "companyId": "c_acme", "name": "Pat Example", "email": "Pat@AcmePEO.example", "title": "CEO", "byUid": "u_owner", "createdAt": "2026-10-29T12:00:00Z"},
+      {"id": "k_dup", "companyId": "c_beta", "name": "Pat Again", "email": "pat@acmepeo.example", "title": "Owner"},
+      {"id": "k_bad", "companyId": "c_beta", "name": "No Mail", "email": "not-an-email"},
+      {"id": "k_orphan", "companyId": "c_missing", "name": "Lost Contact", "email": "lost@x.example"}
+    ],
+    "activities": [
+      {"id": "a1", "companyId": "c_acme", "type": "Call", "direction": "Outbound", "outcome": "Positive", "date": "2026-11-03", "by": "Saad", "byUid": "u_owner", "createdAt": "2026-11-03T14:00:00Z"},
+      {"id": "a2", "companyId": "", "type": "Contacts sequenced", "count": 120, "date": "2026-11-04", "by": "Awais", "byUid": "u_bd"},
+      {"id": "a3", "companyId": "c_acme", "type": "Stage change", "count": 0, "date": "2026-11-20", "summary": "Meeting booked → Proposal sent", "by": "Saad"},
+      {"id": "a4", "companyId": "c_acme", "type": "Email", "date": "not a date"},
+      {"id": "a5", "companyId": "c_missing", "type": "Email", "date": "2026-11-05"},
+      {"id": "a6", "companyId": "c_acme", "type": "Meeting held", "date": "2026-11-10", "count": "2", "by": "Saad"}
+    ],
+    "tasks": [
+      {"id": "t1", "title": "Send recap", "owner": "Awais", "due": "2026-11-21", "companyId": "c_acme", "done": true, "doneAt": "2026-11-21T09:00:00Z", "createdBy": "Saad"},
+      {"id": "t2", "title": "", "owner": "Awais"}
+    ],
+    "outreach": [{"id": "o1", "companyId": "c_acme", "contactId": "k_ceo", "sequence": "PEO back-office", "status": "Replied: positive", "enrolledAt": "2026-11-02", "lastEventAt": "2026-11-05"}],
+    "proposals": [
+      {"id": "pr1", "companyId": "c_acme", "number": "OST-2611-001", "status": "Sent", "version": 2, "sentVersion": 2, "sentAt": "2026-11-20T16:00:00Z", "monthly": 7600, "subject": "Proposal", "createdBy": "Saad"},
+      {"id": "pr2", "companyId": "c_missing", "number": "OST-2611-002", "status": "Draft", "monthly": 2200}
+    ],
+    "proposalVersions": [
+      {"id": "v1", "proposalId": "pr1", "v": 1, "snap": {"items": [{"svc": "Payroll specialist", "seats": 2, "price": 2200}]}, "monthly": 4400, "note": "First draft", "by": "Saad", "createdAt": "2026-11-19T10:00:00Z"},
+      {"id": "v2", "proposalId": "pr1", "v": 2, "snap": {"items": []}, "monthly": 7600, "by": "Saad", "createdAt": "2026-11-20T10:00:00Z"},
+      {"id": "v2b", "proposalId": "pr1", "v": 2, "snap": {}, "monthly": 1, "by": "Saad"}
+    ],
+    "clients": [{"id": "cl1", "name": "Delta Staffing", "domain": "delta.example", "since": "2026-12-05", "notes": "Signed in the push"}],
+    "brokers": [{"id": "b1", "name": "Broker One", "website": "https://brokerone.example"}],
+    "referrals": [{"id": "r1", "brokerId": "b1", "companyId": "c_signed", "status": "Signed", "introDate": "2026-11-01", "seatsPlaced": 3}],
+    "triggers": [{"id": "tr1", "companyId": "c_acme", "type": "Hiring surge", "text": "Posted 4 payroll roles", "date": "2026-10-20", "source": "https://jobs.example/acme"}],
+    "proof": [{"id": "pf1", "title": "Security one-pager", "kind": "Security one-pager", "status": "Draft", "outline": "Controls"}],
+    "reviews": [{"id": "rv1", "kind": "on-demand", "text": "Pace is behind on dials.", "by": "Saad", "createdAt": "2026-11-06T10:00:00Z"}],
+    "research": [{"id": "c_acme", "summary": "Mid-size PEO on PrismHR", "sources": ["https://acmepeo.example/about"]}],
+    "config": [
+      {"id": "dupes", "map": {"c_beta_dup": {"parent": "c_beta", "note": "Same firm"}}},
+      {"id": "platform", "map": {"c_beta": {"p": ["isolved"], "src": "Research"}}},
+      {"id": "triggers", "map": {"c_beta": [{"type": "Platform migration", "text": "Moving off old system", "date": "2026-09"}]}},
+      {"id": "proposalTemplate", "subject": "Proposal for {{company}}", "intro": "Hi", "scope": "Payroll", "pilotText": "Pilot", "terms": "Minimum term: 1 year.", "closing": "Saad", "validDays": 14,
+       "items": [{"svc": "Payroll specialist", "kind": "staff", "seats": 2, "price": 2200}]},
+      {"id": "forecast", "targetContracts": 3, "cycleDays": 21},
+      {"id": "roles", "BD support": {"f": ["tab-myday"]}}
+    ],
+    "audit": [{"id": "u_owner", "who": "Saad", "lastHash": "abc"}],
+    "auditDays": [{"id": "2026-11-20-0", "user": "u_owner", "day": "2026-11-20", "events": [
+      {"t": "2026-11-20T16:00:00Z", "u": "u_owner", "act": "update", "col": "companies", "id": "c_acme", "label": "Acme PEO, LLC", "f": {"stage": ["Meeting booked", "Proposal sent"]}, "h": "h1", "p": ""},
+      {"t": "2026-11-20T16:01:00Z", "u": "u_owner", "act": "view", "col": "proposals", "id": "pr1", "h": "h2", "p": "h1"}
+    ]}]
+  },
+  "counts": {}
+}

@@ -1,6 +1,6 @@
 # @ostcrm/db
 
-Schema, numbered migrations with down paths, row-level security, and (next PR) the artifact migration.
+Schema, numbered migrations with down paths, row-level security, and the artifact migration.
 
 ## Migrations
 
@@ -21,6 +21,7 @@ DATABASE_URL=... pnpm --filter @ostcrm/db migrate down --steps 1
 | 0003 config | team, pricing, plan, targets, cadence, offers, objections, blocked terms; effective-dated |
 | 0004 system | audit_log with a trigger on every business table, ai_runs, errors, outbox, idempotency_keys |
 | 0005 rls | Grants to `app_user` and row-level security per role |
+| 0006 proposal template | The proposal template as effective-dated config |
 
 ## How access is enforced in the database
 
@@ -44,3 +45,24 @@ Tests run against a real PostgreSQL 16 and create a fresh database per file:
 ```
 TEST_DATABASE_URL=postgres://postgres@localhost:5432/postgres pnpm --filter @ostcrm/db test
 ```
+
+## Artifact migration (`migrate-artifact/`)
+
+Turns the file from the artifact's "Export all data" button into rows for the new tables. Engineer B runs it; it never runs from a laptop against production, and no export is ever committed.
+
+```
+MASK_SECRET=... tsx migrate-artifact/cli.ts mask   export.json masked.json              # for staging dry runs
+               tsx migrate-artifact/cli.ts report export.json people.json report.md     # dry run, no database
+DATABASE_URL=... tsx migrate-artifact/cli.ts load  export.json people.json report.md
+```
+
+`people.json` maps each self-chosen team name to a real Entra account (`teamName`, `email`, `displayName`, `entraOid`, optional `role`). Engineer B fills it in from the tenant.
+
+What it does:
+- keeps every artifact id in `legacy_id`; anything not mapped to a column goes to `extra`, so no field is lost;
+- normalizes domains and emails; known duplicates and domain clashes load as linked duplicates instead of failing;
+- splits each company's stage, seats and dates into a `deals` row (for any company past Target or with deal data);
+- converts dollars to cents; moves the proposal template, seeded triggers and platform map out of config;
+- imports the old audit trail with its hashes kept for reference;
+- loads in one transaction with every foreign key and check enforced, and refuses a non-empty database;
+- writes the reconciliation report: counts in and out, every rejected or adjusted record with a reason, deals per stage, touches per person per week, proposals and clients totals.
