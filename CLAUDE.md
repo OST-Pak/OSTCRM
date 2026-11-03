@@ -1,6 +1,8 @@
 # OSTCRM: working rules for Claude
 
-This repo is the hosted version of the Oak Street BD CRM. The build brief is "Oak Street BD CRM: Re-platforming and Go-Live Instructions" (Nov 2, 2026). Business rules come from "Oak Street BD CRM: Build Instructions for Claude" and, where that doc is silent, from the behaviour of the live artifact CRM. If either doc is missing from the session, ask Saad for it before changing behaviour.
+This repo is the hosted version of the Oak Street BD CRM. The build brief is "Oak Street BD CRM: Re-platforming and Go-Live Instructions" (Nov 2, 2026; https://claude.ai/artifact/UmNWJEE9LZjBfRmwfCJFF5). Business rules come from "Oak Street BD CRM: Build Instructions for Claude" (https://claude.ai/artifact/WehyjQuYbBNjmuuREpHD9d) and, where that doc is silent, from the behaviour of the live artifact CRM. Read both before changing behaviour; if you cannot open them, ask Saad. `docs/rules-registry.md` maps every registry rule to its code and tests.
+
+Where the two docs differ, the re-platforming brief wins for the hosted app (it is newer and written for it): money in integer cents rather than whole dollars, and five roles (owner, admin, BD support, specialist, read only) rather than Owner, Contributor and Viewer.
 
 ## Ownership
 
