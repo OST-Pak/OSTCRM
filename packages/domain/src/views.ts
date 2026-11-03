@@ -62,3 +62,22 @@ export function pushLine(today: IsoDate, plan: PlanConfig = DEFAULT_PLAN): strin
   const toDeadline = daysBetween(today, plan.deadline);
   return `Day ${n} of ${total}, ${toDeadline >= 0 ? `${toDeadline} days to the Dec 11 signing deadline` : "Dec 11 deadline passed"}`;
 }
+
+/** What a role can do in the company drawer. The API and the database enforce the same; this only hides controls. */
+export interface DrawerAbilities {
+  editCompany: boolean;
+  editDeal: boolean;
+  logActivity: boolean;
+  manageTasks: boolean;
+  editContacts: boolean;
+  addProspect: boolean;
+  archive: boolean;
+}
+export function drawerAbilities(role: AppRole, ownsDeal: boolean): DrawerAbilities {
+  const team = role === "owner" || role === "admin" || role === "bd_support";
+  const spec = role === "specialist";
+  return {
+    editCompany: team, editDeal: team || (spec && ownsDeal), logActivity: team || spec, manageTasks: team || spec,
+    editContacts: team, addProspect: team, archive: team
+  };
+}

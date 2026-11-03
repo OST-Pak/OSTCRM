@@ -14,6 +14,8 @@ import { buildApp } from "../src/app.js";
 import { adminRoutes } from "../src/routes/admin.js";
 import { pipelineRoutes } from "../src/routes/pipeline.js";
 import { prospectRoutes } from "../src/routes/prospects.js";
+import { companyRoutes } from "../src/routes/company.js";
+import { boardRoutes } from "../src/routes/board.js";
 import { AUDIENCE, TENANT, fakeEntra } from "../test/fake-entra.js";
 import { seedDemo } from "../test/seed-demo.js";
 
@@ -93,6 +95,8 @@ const app = buildApp({ pool, auth: { tenantId: TENANT, audience: AUDIENCE, keys:
 await app.register(adminRoutes, { prefix: "/v1" });
 await app.register(pipelineRoutes, { prefix: "/v1" });
 await app.register(prospectRoutes, { prefix: "/v1" });
+await app.register(companyRoutes, { prefix: "/v1" });
+await app.register(boardRoutes, { prefix: "/v1" });
 // Local preview only: the sign-in picker asks for a token for the role you choose.
 app.get("/local/sign-in", { config: { action: "public" } }, async () =>
   Promise.all(Object.values(people).map(async p => ({ label: p.label, token: await entra.token(p.oid, { exp: "12h" }) }))));

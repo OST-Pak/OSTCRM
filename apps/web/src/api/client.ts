@@ -9,7 +9,7 @@ export class ApiError extends Error {
 export interface Api {
   get<T>(path: string): Promise<T>;
   /** A command: sends an Idempotency-Key so a retry of the same action never runs twice. Pass the same key to retry. */
-  command<T>(method: "POST" | "PATCH", path: string, body: unknown, key?: string): Promise<T>;
+  command<T>(method: "POST" | "PATCH" | "PUT", path: string, body: unknown, key?: string): Promise<T>;
   reportError(message: string, extra?: { stack?: string; route?: string; requestId?: string; context?: Record<string, unknown> }): void;
 }
 

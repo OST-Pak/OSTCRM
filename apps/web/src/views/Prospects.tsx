@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { messageFor } from "../api/client.js";
 import { todayLocal, useApp } from "../context.js";
+import { drawerAbilities } from "@ostcrm/domain";
+import { useOpenCompany } from "./CompanyDrawer.js";
 
 interface Prospect {
   id: string; name: string; domain: string | null; website: string | null; type: string; fit: string | null; fitReason: string | null;
@@ -17,7 +19,8 @@ const SORTS = [["tier", "Tier"], ["name", "Name"], ["state", "State"], ["size", 
 
 /** Prospects: every company, tiered on the server with the same scoring as the current CRM. Read only for now. */
 export function Prospects() {
-  const { api } = useApp();
+  const { api, me } = useApp();
+  const open = useOpenCompany();
   const [q, setQ] = useState("");
   const [typed, setTyped] = useState("");
   const [f, setF] = useState({ tier: "", type: "", fit: "", state: "", sort: "tier" });
@@ -34,7 +37,7 @@ export function Prospects() {
 
   return (
     <section className="panel">
-      <h2>Prospects</h2>
+      <div className="panel-head"><h2>Prospects</h2>{drawerAbilities(me.role, false).addProspect && <button type="button" className="primary" onClick={() => open("new")}>Add prospect</button>}</div>
       {d && <p className="muted small">Tier A {d.facets.tiers.A} · Tier B {d.facets.tiers.B} · Tier C {d.facets.tiers.C}. Tiers rank every eligible account; partners, clients, unfit, closed and duplicate records have none.</p>}
       <div className="toolbar">
         <label className="grow">Search<input type="search" value={typed} onChange={e => setTyped(e.target.value)} placeholder="Name or website" /></label>
@@ -56,7 +59,7 @@ export function Prospects() {
                 {d.items.map(p => (
                   <tr key={p.id}>
                     <td><span className={`tier${p.tier ? " t" + p.tier : ""}`} title={p.why.join(", ")}>{p.tier ?? "–"}</span></td>
-                    <td><b>{p.name}</b>{p.domain && <div className="small muted">{p.domain}</div>}
+                    <td><a href="#" onClick={e => { e.preventDefault(); open(p.id); }}><b>{p.name}</b></a>{p.domain && <div className="small muted">{p.domain}</div>}
                       {p.enwage && <span className="pill neutral">Enwage</span>} {p.duplicate && <span className="pill warn">Duplicate</span>} {p.recentTriggers > 0 && <span className="pill good">Trigger</span>}</td>
                     <td>{p.type || "–"}</td>
                     <td>{p.fit ? <span className={`pill ${p.fit === "Not a fit" ? "bad" : p.fit === "Review" ? "warn" : "neutral"}`} title={p.fitReason ?? ""}>{p.fit}</span> : "–"}</td>

@@ -6,6 +6,8 @@ export { AUDIENCE, TENANT, fakeEntra };
 import { adminRoutes } from "../src/routes/admin.js";
 import { pipelineRoutes } from "../src/routes/pipeline.js";
 import { prospectRoutes } from "../src/routes/prospects.js";
+import { companyRoutes } from "../src/routes/company.js";
+import { boardRoutes } from "../src/routes/board.js";
 import { ADMIN_URL, freshDb, type TestDb } from "../../../packages/db/test/helpers.js";
 
 export type Who = "owner" | "admin" | "bd_support" | "specialist" | "read_only";
@@ -28,6 +30,8 @@ export async function testApp() {
   await app.register(adminRoutes, { prefix: "/v1" });
   await app.register(pipelineRoutes, { prefix: "/v1" });
   await app.register(prospectRoutes, { prefix: "/v1" });
+  await app.register(companyRoutes, { prefix: "/v1" });
+  await app.register(boardRoutes, { prefix: "/v1" });
   await app.ready();
   const auth = async (who: keyof typeof people) => ({ authorization: `Bearer ${await entra.token(people[who].oid)}` });
   return {

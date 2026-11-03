@@ -199,13 +199,13 @@ export function transformExport(x: ArtifactExport, opts: TransformOptions): Tran
     if (!co) { reject("contacts", k.id, "Company not found"); continue; }
     let email: string | null = str(k.email) ? normalizeEmail(str(k.email)) : null;
     if (email && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email)) { adjust("contacts", k.id, "Invalid email cleared"); email = null; }
-    const extra = extraOf(k, ["companyId", "name", "email", "phone", "title", "role", "linkedin", "emailStatus", "source"]);
+    const extra = extraOf(k, ["companyId", "name", "email", "phone", "title", "role", "linkedin", "emailStatus", "source", "verifiedAt"]);
     if (email && seenContactEmail.has(email)) { adjust("contacts", k.id, `Email ${email} already belongs to another contact; cleared on this one`); extra.duplicateEmail = email; email = null; }
     if (email) seenContactEmail.add(email);
     const id = uuidV7();
     contactId.set(k.id, id);
     contacts.push({ id, ...std(k), company_id: co, name: str(k.name) || "(no name)", email, phone: orNull(k.phone), title: orNull(k.title), role: orNull(k.role),
-      linkedin: orNull(k.linkedin), email_status: orNull(k.emailStatus), source: orNull(k.source), extra });
+      linkedin: orNull(k.linkedin), email_status: orNull(k.emailStatus), source: orNull(k.source), verified_on: dateOrNull(k.verifiedAt), extra });
   }
   // Deal buyer links now that contacts have ids.
   for (const c of C("companies")) {

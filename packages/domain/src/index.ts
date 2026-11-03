@@ -12,3 +12,5 @@ export * from "./proposal.js";
 export * from "./registry.js";
 export * from "./views.js";
 export * from "./prospects.js";
+export * from "./deal.js";
+export * from "./pipeline.js";

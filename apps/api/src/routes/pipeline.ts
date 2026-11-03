@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { STAGES, normalizeCompanyName } from "@ostcrm/domain";
+import { LOGGABLE_ACTIVITY_TYPES, STAGES, activityEffect, normalizeCompanyName } from "@ostcrm/domain";
 import { idempotent } from "../app.js";
 import { ApiError, badRequest, conflict, notFound } from "../errors.js";
 
@@ -125,27 +125,81 @@ export async function pipelineRoutes(app: FastifyInstance) {
     }));
   });
 
-  /** Log an activity. Activities are append-only; corrections are new rows that reference the original. */
+  /**
+   * Log an activity. Activities are append-only; corrections are new rows that reference the original.
+   * When the company has a deal, logging also applies the artifact's effects in the same transaction:
+   * auto-advance the stage, record the first proposal date, and carry the next step (domain `activityEffect`).
+   * An open deal needs a next step and a date that is not in the past.
+   */
   app.post("/activities", { config: { action: "activity.log" } }, async (req, reply) => {
     const b = z.object({
       companyId: uuid.nullable(),
       dealId: uuid.nullable().optional(),
       contactId: uuid.nullable().optional(),
-      type: z.enum(["Email", "Call", "WhatsApp", "LinkedIn", "Meeting booked", "Meeting held", "Proposal sent", "Note", "Contacts sequenced"]),
+      type: z.enum(LOGGABLE_ACTIVITY_TYPES),
       direction: z.enum(["Inbound", "Outbound"]).nullable().optional(),
       outcome: z.enum(["Positive", "Neutral", "Negative", "No answer"]).nullable().optional(),
       objection: z.string().max(100).nullable().optional(),
       touchCount: z.number().int().min(0).max(10_000).default(1),
       occurredOn: isoDate,
       summary: z.string().max(5000).nullable().optional(),
+      nextStep: z.string().trim().max(500).nullable().optional(),
+      nextStepOn: isoDate.nullable().optional(),
+      today: isoDate.optional(),
       correctsId: uuid.nullable().optional()
     }).strict().parse(req.body);
+    const today = b.today ?? new Date().toISOString().slice(0, 10);
     return req.tx(db => idempotent(req, reply, db, async () => {
+      // The deal this activity is about: the one named, else the company's current deal.
+      let deal = b.dealId
+        ? (await db.query("SELECT id, stage, version, owner_id, proposal_sent_on::text FROM deals WHERE id = $1 AND archived_at IS NULL", [b.dealId])).rows[0]
+        : b.companyId
+          ? (await db.query(`SELECT id, stage, version, owner_id, proposal_sent_on::text FROM deals WHERE company_id = $1 AND archived_at IS NULL
+                              ORDER BY (stage IN ('Signed', 'Lost', 'Nurture (Q1)')), updated_at DESC LIMIT 1`, [b.companyId])).rows[0]
+          : undefined;
+      if (b.dealId && !deal) throw notFound("Deal");
+      // A company with no deal row is a deal at Target, as in the artifact: an activity that moves it creates the deal.
+      if (!deal && b.companyId && req.user!.role !== "specialist") {
+        const co = (await db.query("SELECT owner_id FROM companies WHERE id = $1 AND archived_at IS NULL AND duplicate_of IS NULL", [b.companyId])).rows[0];
+        if (co) deal = { id: null, stage: "Target", version: null, owner_id: co.owner_id, proposal_sent_on: null };
+      }
+      // A Specialist works only deals assigned to them: on anyone else's, the activity is kept on the company and the deal is left alone.
+      if (deal && req.user!.role === "specialist" && deal.owner_id !== req.user!.id) {
+        if (b.dealId) throw new ApiError(403, "forbidden", "Specialists can log against only deals assigned to them");
+        deal = undefined;
+      }
+      const effect = activityEffect(deal ? { stage: deal.stage, proposalSentOn: deal.proposal_sent_on } : null,
+        { type: b.type, direction: b.direction ?? null, outcome: b.outcome ?? null, occurredOn: b.occurredOn, nextStep: b.nextStep ?? null, nextStepOn: b.nextStepOn ?? null }, today);
+      if (effect.error) throw badRequest(effect.error);
+      const moves = !!(effect.stage || effect.proposalSentOn || effect.nextStep !== undefined);
+      if (deal && !deal.id) {
+        deal = moves
+          ? { ...(await db.query("INSERT INTO deals (company_id, stage, owner_id, stage_changed_on) VALUES ($1, 'Target', $2, $3) RETURNING id, stage, version, owner_id", [b.companyId, deal.owner_id, today])).rows[0], proposal_sent_on: null }
+          : undefined;
+      }
       const r = await db.query(
         `INSERT INTO activities (company_id, deal_id, contact_id, type, direction, outcome, objection, touch_count, occurred_on, summary, source, corrects_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'CRM', $11) RETURNING *`,
-        [b.companyId, b.dealId ?? null, b.contactId ?? null, b.type, b.direction ?? null, b.outcome ?? null, b.objection ?? null, b.touchCount, b.occurredOn, b.summary ?? null, b.correctsId ?? null]);
-      return { status: 201, body: r.rows[0] };
+        [b.companyId, deal?.id ?? null, b.contactId ?? null, b.type, b.direction ?? null, b.outcome ?? null, b.objection ?? null, b.touchCount, b.occurredOn, b.summary ?? null, b.correctsId ?? null]);
+      let updated: unknown = null;
+      if (deal && moves) {
+        const u = await db.query(
+          `UPDATE deals SET stage = coalesce($2::deal_stage, stage),
+                  stage_changed_on = CASE WHEN $2::deal_stage IS NOT NULL THEN $5::date ELSE stage_changed_on END,
+                  cadence_stage = CASE WHEN $2::deal_stage IS NOT NULL THEN NULL ELSE cadence_stage END,
+                  cadence_done = CASE WHEN $2::deal_stage IS NOT NULL THEN '{}' ELSE cadence_done END,
+                  proposal_sent_on = coalesce(proposal_sent_on, $3::date),
+                  next_step = CASE WHEN $4::boolean THEN $6::text ELSE next_step END,
+                  next_step_on = CASE WHEN $4::boolean THEN $7::date ELSE next_step_on END
+            WHERE id = $1 RETURNING *`,
+          [deal.id, effect.stage ?? null, effect.proposalSentOn ?? null, effect.nextStep !== undefined, today, effect.nextStep ?? null, effect.nextStepOn ?? null]);
+        updated = u.rows[0];
+        if (effect.stage) {
+          await db.query("INSERT INTO deal_stage_events (deal_id, from_stage, to_stage, changed_on) VALUES ($1, $2, $3, $4)", [deal.id, deal.stage, effect.stage, today]);
+          await db.query("INSERT INTO outbox (topic, payload) VALUES ('deal.stage_changed', $1)", [JSON.stringify({ dealId: deal.id, from: deal.stage, to: effect.stage, on: today, by: req.user!.id })]);
+        }
+      }
+      return { status: 201, body: { ...r.rows[0], deal: updated } };
     }));
   });
 
