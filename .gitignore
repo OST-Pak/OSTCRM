@@ -7,3 +7,4 @@ coverage/
 .DS_Store
 # Never commit CRM data exports
 oak-street-crm-export-*.json
+local-data/
