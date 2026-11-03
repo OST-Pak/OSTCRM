@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+*.log
+.DS_Store
+# Never commit CRM data exports
+oak-street-crm-export-*.json
