@@ -4,6 +4,9 @@ Choices that change behaviour, newest first. Each entry: date, decision, who dec
 
 | Date | Decision | Decided by | Why |
 |---|---|---|---|
+| 2026-11-02 | A company gets a `deals` row at migration if it is past Target or has seats or a next step. Duplicates do not get their own deal. | Claude | The artifact kept the deal on the company; Target-only prospects have no deal yet. |
+| 2026-11-02 | The migration loads with all triggers on, so every loaded record gets an audit row marked "artifact migration". | Claude | Keeps foreign keys enforced and gives every record a provenance entry. |
+| 2026-11-02 | Staging dry runs use an export masked with `migrate-artifact mask` (names, contact details and free text replaced; audit trail removed). | Claude | Default for open decision 11. |
 | 2026-11-02 | Migrations are hand-written SQL with a down script each, run by our own small runner. Drizzle is added with the API for typed queries only. | Claude | Drizzle Kit does not generate down migrations; the brief requires a down path for every migration. |
 | 2026-11-02 | The audit log is written by a database trigger on every business table, in the same transaction as the change. Reads, exports and sign-ins are logged by the API through `app.log_event`, which stamps the real actor. | Claude | No code path, including a bug or a direct query by the app role, can change data without an audit row. |
 | 2026-11-02 | Known duplicates load as their own company with `duplicate_of` set; the unique-domain rule skips them. | Claude | Default for open decision 12 until Saad decides. |
