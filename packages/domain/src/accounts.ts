@@ -143,3 +143,23 @@ export function enwageFlag(c: Company, resolvedType: string, platform: string | 
   }
   return null;
 }
+
+// ---------- displayed type and platform ----------
+
+/**
+ * The type shown for a company, as the artifact computes it: partners and clients show their own type;
+ * every other company shows the researched type when there is one, else its own type.
+ * Note: a type set by hand is overridden by the researched type (open decision 20).
+ */
+export function displayType(c: { type?: string | null; classified_type?: string | null }): string {
+  if (isPartnerOrClient(c.type ?? undefined)) return String(c.type);
+  return c.classified_type || c.type || "";
+}
+
+/** Platform and where it came from: the CRM field first (unless "Unknown"), then the platform map, then research. */
+export function resolvePlatform(crm: string | null | undefined, mapped: string | null | undefined, researched: string | null | undefined): { name: string; source: "CRM" | "Platform map" | "Research" } | null {
+  if (crm && crm !== "Unknown") return { name: crm, source: "CRM" };
+  if (mapped) return { name: mapped, source: "Platform map" };
+  if (researched) return { name: researched, source: "Research" };
+  return null;
+}

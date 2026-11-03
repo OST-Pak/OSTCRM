@@ -123,3 +123,26 @@ describe("Enwage flag", () => {
     expect(enwageFlag(co({ platform: "Enwage" }), "PEO", "isolved")).toBeNull();
   });
 });
+
+describe("displayed type and platform", () => {
+  it("partners and clients keep their own type", async () => {
+    const { displayType } = await import("../src/index.js");
+    expect(displayType({ type: "PEO broker", classified_type: "PEO" })).toBe("PEO broker");
+    expect(displayType({ type: "Existing client", classified_type: "PEO" })).toBe("Existing client");
+  });
+
+  it("other companies show the researched type, else their own, else nothing", async () => {
+    const { displayType } = await import("../src/index.js");
+    expect(displayType({ type: "Other", classified_type: "ASO" })).toBe("ASO");
+    expect(displayType({ type: "PEO", classified_type: null })).toBe("PEO");
+    expect(displayType({})).toBe("");
+  });
+
+  it("platform comes from the CRM, then the platform map, then research", async () => {
+    const { resolvePlatform } = await import("../src/index.js");
+    expect(resolvePlatform("PrismHR", "isolved", "Worklio")).toEqual({ name: "PrismHR", source: "CRM" });
+    expect(resolvePlatform("Unknown", "isolved", "Worklio")).toEqual({ name: "isolved", source: "Platform map" });
+    expect(resolvePlatform("", null, "Worklio")).toEqual({ name: "Worklio", source: "Research" });
+    expect(resolvePlatform(null, null, null)).toBeNull();
+  });
+});

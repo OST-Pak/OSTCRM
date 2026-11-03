@@ -31,7 +31,7 @@ describe("transform", () => {
 
   it("keeps original ids, normalizes domains and moves unmapped fields to extra", () => {
     const acme = byLegacy(t, "companies", "c_acme");
-    expect(acme).toMatchObject({ name: "Acme PEO, LLC", name_normalized: "acme", domain: "acmepeo.example", type: "PEO", duplicate_of: null });
+    expect(acme).toMatchObject({ name: "Acme PEO, LLC", name_normalized: "acme", domain: "acmepeo.example", duplicate_of: null });
     expect(acme.extra).toEqual({ naics: ["561330"], notes: "Met at a conference" });
     expect(acme.created_by).toBe(rows(t, "users")[0]!.id);
     expect(byLegacy(t, "companies", "c_beta")).toMatchObject({ domain: "betapayroll.example", platform_name: "isolved" });
@@ -105,7 +105,7 @@ describe("transform", () => {
 
   it("writes a readable report", () => {
     const md = reportMarkdown(t.report);
-    expect(md).toContain("## Rejected (7)");
+    expect(md).toContain("## Rejected (9)");
     expect(md).toContain("| Proposal sent | 1 |");
     expect(md).toContain("Monthly value of sent proposals: $7,600");
   });
@@ -126,7 +126,7 @@ describe("mask", () => {
     // Same input, same mask; clients still match their company by masked domain.
     const signed = m.collections.companies!.find(c => c.id === "c_signed")!;
     expect(m.collections.clients![0]!.domain).toBe(signed.domain);
-    expect(JSON.stringify(m)).not.toMatch(/Acme|Pat Example|conference/);
+    expect(JSON.stringify(m)).not.toMatch(/Acme|Pat Example|conference|Columbus Holdings|Same owners|Too small|oakstreet\.example|jobs\.example/);
     expect(() => maskExport(fixture(), "short")).toThrow(/16 characters/);
   });
 
@@ -163,5 +163,59 @@ describe("load", () => {
       await expect(loadTransformed(t2.owner, t)).rejects.toThrow();
       expect((await t2.owner.query("SELECT count(*)::int AS n FROM companies")).rows[0].n).toBe(0);
     } finally { await t2.drop(); }
+  });
+});
+
+describe("research data", () => {
+  const t = transformExport(fixture(), { people: people() });
+
+  it("carries location, reach, lines of business, researched type, parent and founded year", () => {
+    expect(byLegacy(t, "companies", "c_acme")).toMatchObject({ hq_city: "Columbus", hq_state: "OH", reach: "Regional", reach_basis: "Clients in 3 states",
+      lines_of_business: ["PEO", "Payroll"], classified_type: "PEO", parent_name: "Acme Holdings", parent_source: "Web",
+      related_note: "Merged into Acme Holdings in 2024", founded_year: 1998 });
+  });
+
+  it("carries size, hiring signal, priority, best offer and platform with its source", () => {
+    expect(byLegacy(t, "companies", "c_acme")).toMatchObject({ size: "Medium", employees: 120, annual_revenue_cents: 2_500_000_000, size_source: "Apollo",
+      hiring_signal: "strong", hiring_categories: ["PEO ops", "F&A"], hiring_jobs: 4, research_priority: 5, best_offer: "PEO back-office team",
+      platform_name: "PrismHR", platform_source: "Research" });
+  });
+
+  it("drops values that are not valid instead of failing the load", () => {
+    expect(byLegacy(t, "companies", "c_beta")).toMatchObject({ reach: null, size: null, research_priority: null, founded_year: null, hiring_signal: "none" });
+  });
+
+  it("applies the fit record as the artifact does: own fit wins, researched type unless set by hand", () => {
+    expect(byLegacy(t, "companies", "c_acme")).toMatchObject({ fit: "Not a fit", fit_reason: "Too small", type: "ASO", type_set_by_hand: false });
+    expect(byLegacy(t, "companies", "c_beta")).toMatchObject({ type: "Payroll only", type_set_by_hand: true });
+    expect(byLegacy(t, "companies", "c_odd")).toMatchObject({ fit: "Review", type: "Payroll only" });
+  });
+
+  it("the platform map wins over research; Unknown in the CRM is ignored", () => {
+    expect(byLegacy(t, "companies", "c_beta")).toMatchObject({ platform_name: "isolved", platform_source: "Platform map" });
+  });
+
+  it("loads company groups and links members", () => {
+    const g = rows(t, "company_groups");
+    expect(g).toEqual([expect.objectContaining({ legacy_id: "group:g1", name: "Acme family", note: "Same owners", lines_of_business: ["PEO"] })]);
+    expect(byLegacy(t, "companies", "c_acme").group_id).toBe(g[0]!.id);
+    expect(byLegacy(t, "companies", "c_clash").group_id).toBe(g[0]!.id);
+  });
+
+  it("loads today's featured openings and the hiring watch list, and reports what it skipped", () => {
+    expect(rows(t, "featured_openings")).toEqual([expect.objectContaining({ company_id: byLegacy(t, "companies", "c_acme").id, first_seen: "2026-11-01", last_seen: "2026-11-02", scan_run_at: "2026-11-02T13:00:00.000Z" })]);
+    expect(rows(t, "hiring_watch")).toEqual([expect.objectContaining({ name: "Acme PEO", apollo_org_id: "apollo-org-1", company_id: byLegacy(t, "companies", "c_acme").id })]);
+    expect(t.report.rejected).toEqual(expect.arrayContaining([
+      { collection: "config/featured", id: "item:1", reason: "Company not found" },
+      { collection: "config/watch", id: "org:1", reason: "No name or Apollo id" }
+    ]));
+  });
+
+  it("flags team members missing from the people mapping, with their email", () => {
+    expect(t.report.adjusted).toContainEqual({ collection: "config/team", id: "Waqas", note: expect.stringContaining("waqas@oakstreet.example") });
+  });
+
+  it("reads the research panel's summary and sources from the artifact's real shape", () => {
+    expect(rows(t, "research")[0]).toMatchObject({ summary: "Mid-size PEO on PrismHR", sources: ["https://acmepeo.example/about"] });
   });
 });

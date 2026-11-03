@@ -3,7 +3,7 @@
  * Every record keeps its artifact id in legacy_id. Anything not mapped to a column is kept in `extra`,
  * so no field is lost. Nothing is silently dropped: each skipped record is listed in the report with a reason.
  */
-import { domainOf, normalizeCompanyName, normalizeEmail, touchCount, weekStart, STAGES, type Stage } from "@ostcrm/domain";
+import { domainOf, normalizeCompanyName, normalizeEmail, resolvePlatform, touchCount, weekStart, STAGES, type Stage } from "@ostcrm/domain";
 import type { ArtifactExport, ArtifactRecord, Note, PersonMapping, Rejection, ReconciliationReport, Row, Transformed } from "./types.js";
 import { uuidV7 } from "./uuid.js";
 
@@ -77,6 +77,28 @@ export function transformExport(x: ArtifactExport, opts: TransformOptions): Tran
   const config = new Map(C("config").map(c => [c.id, c]));
   const dupes = (config.get("dupes")?.map ?? config.get("dupes")?.dupes ?? {}) as Record<string, { parent?: string }>;
   const platformMap = (config.get("platform")?.map ?? {}) as Record<string, { p?: string[] } | string>;
+  // Research kept in config/ records, keyed by company id.
+  type Cls = { c?: string; s?: string; r?: string; rb?: string; l?: string[]; t?: string; g?: string; p?: string; ps?: string; rel?: string };
+  type Rs = { h?: string; cats?: string[]; p?: number; o?: string; pl?: string; j?: number; a?: number; w?: number };
+  type Sz = { s?: string; e?: number | null; r?: number | null; src?: string };
+  type Ft = { fit?: string; reason?: string; type?: string };
+  const cls = (config.get("class")?.map ?? {}) as Record<string, Cls>;
+  const rs = (config.get("research")?.map ?? {}) as Record<string, Rs>;
+  const size = (config.get("size")?.map ?? {}) as Record<string, Sz>;
+  const founded = (config.get("founded")?.map ?? {}) as Record<string, string | number>;
+  const groupsCfg = (config.get("groups")?.map ?? {}) as Record<string, { n?: string; note?: string; lines?: string[]; ids?: string[] }>;
+  const fitCfg = (config.get("fit")?.map ?? {}) as Record<string, Ft>;
+
+  // ---------- company groups ----------
+  const groups: Row[] = [];
+  const groupId = new Map<string, string>();
+  for (const [gid, g] of Object.entries(groupsCfg)) {
+    const id = uuidV7();
+    groupId.set(gid, id);
+    groups.push({ id, legacy_id: `group:${gid}`, name: str(g.n) || gid, note: orNull(g.note), lines_of_business: Array.isArray(g.lines) ? g.lines.map(String) : [] });
+  }
+  const groupOfCompany = new Map<string, string>();
+  for (const [gid, g] of Object.entries(groupsCfg)) for (const cid of g.ids ?? []) groupOfCompany.set(cid, gid);
 
   // ---------- platforms ----------
   const platforms: Row[] = [];
@@ -95,7 +117,7 @@ export function transformExport(x: ArtifactExport, opts: TransformOptions): Tran
   const companyId = new Map<string, string>();
   const dealIdOfCompany = new Map<string, string>();
   const liveDomain = new Map<string, string>();
-  const COMPANY_COLS = ["name", "domain", "website", "phone", "type", "channel", "fit", "state", "worksiteEmployees", "platform", "owner", "enwageLead", "enwageWhy", "verifiedAt", "v"];
+  const COMPANY_COLS = ["name", "domain", "website", "phone", "type", "channel", "fit", "fitReason", "state", "worksiteEmployees", "platform", "owner", "enwageLead", "enwageWhy", "verifiedAt", "v"];
   const DEAL_COLS = ["offer", "stage", "stageChangedAt", "staffSeats", "managerSeats", "proposalValue", "nextStep", "nextStepDate", "decisionDate", "proposalDueDate", "proposalSentDate",
     "contractDueDate", "contractSentDate", "signatureDueDate", "signedAt", "targetStartDate", "lostReason", "objection", "economicBuyerId", "decisionMakerId", "cad"];
   // Parents first, so a duplicate can point at its parent.
@@ -119,12 +141,28 @@ export function transformExport(x: ArtifactExport, opts: TransformOptions): Tran
     const owner = userIdOfName(c.owner);
     if (str(c.owner) && !owner) adjust("companies", c.id, `Owner "${str(c.owner)}" has no person in the mapping; loaded without an owner`);
     const pm = platformMap[c.id];
-    const platformName = str(c.platform) && str(c.platform) !== "Unknown" ? str(c.platform) : (typeof pm === "string" ? pm : pm?.p?.[0]) || null;
+    const k = cls[c.id] ?? {}, r = rs[c.id] ?? {}, z = size[c.id] ?? {}, ft = fitCfg[c.id] ?? {};
+    const plat = resolvePlatform(str(c.platform), (typeof pm === "string" ? pm : pm?.p?.[0]) || null, r.pl || null);
+    const platformName = plat?.name ?? null;
+    // The artifact applies config/fit on top of each company: the company's own fit wins, and the
+    // researched type is used unless the type was set by hand.
+    const typeSet = c.typeSet === true;
+    const type = typeSet ? orNull(c.type) : orNull(ft.type) ?? orNull(c.type);
+    const gid = k.g || groupOfCompany.get(c.id);
+    const yr = Number(String(founded[c.id] ?? "").slice(0, 4));
     companyId.set(c.id, id);
     companies.push({
       id, ...std(c), name, name_normalized: normalizeCompanyName(name), domain, website: orNull(c.website), phone: orNull(c.phone),
-      type: orNull(c.type), channel: orNull(c.channel), fit: orNull(c.fit), state: orNull(c.state), worksite_employees: intOrNull(c.worksiteEmployees),
-      platform_name: platformName, platform_id: platformName ? platformIdByName.get(platformName.toLowerCase()) ?? null : null,
+      type, type_set_by_hand: typeSet, channel: orNull(c.channel), fit: orNull(c.fit) ?? orNull(ft.fit), fit_reason: orNull(c.fitReason) ?? orNull(ft.reason),
+      state: orNull(c.state), worksite_employees: intOrNull(c.worksiteEmployees),
+      platform_name: platformName, platform_source: plat?.source ?? null, platform_id: platformName ? platformIdByName.get(platformName.toLowerCase()) ?? null : null,
+      hq_city: orNull(k.c), hq_state: orNull(k.s), reach: ["National", "Regional", "Unknown"].includes(str(k.r)) ? k.r : null, reach_basis: orNull(k.rb),
+      lines_of_business: Array.isArray(k.l) ? k.l.map(String) : [], classified_type: orNull(k.t), group_id: gid ? groupId.get(gid) ?? null : null,
+      parent_name: orNull(k.p), parent_source: orNull(k.ps), related_note: orNull(k.rel),
+      founded_year: yr >= 1800 && yr <= 2100 ? yr : null,
+      size: ["Small", "Medium", "Large"].includes(str(z.s)) ? z.s : null, employees: intOrNull(z.e), annual_revenue_cents: dollarsToCents(z.r), size_source: orNull(z.src),
+      hiring_signal: ["strong", "weak", "none"].includes(str(r.h)) ? r.h : null, hiring_categories: Array.isArray(r.cats) ? r.cats.map(String) : [],
+      hiring_jobs: intOrNull(r.j), research_priority: Number.isInteger(r.p) && r.p! >= 1 && r.p! <= 5 ? r.p : null, best_offer: orNull(r.o),
       owner_id: owner, enwage_lead: Boolean(c.enwageLead), enwage_why: orNull(c.enwageWhy), verified_on: dateOrNull(c.verifiedAt ?? c.v),
       duplicate_of: duplicateOf, extra: extraOf(c, [...COMPANY_COLS, ...DEAL_COLS])
     });
@@ -305,8 +343,33 @@ export function transformExport(x: ArtifactExport, opts: TransformOptions): Tran
   for (const r of C("research")) {
     const co = companyId.get(str(r.companyId) || r.id);
     if (!co) { reject("research", r.id, "Company not found"); continue; }
-    research.push({ id: uuidV7(), ...std(r), company_id: co, summary: orNull(r.summary ?? r.text), sources: Array.isArray(r.sources) ? r.sources : [],
+    // Artifact shape: {web: {summary, sources, ...}, apollo: {...}, priority, hiringSignal, openingAngle, bestOffer, ...}.
+    const web = (r.web ?? {}) as Row;
+    research.push({ id: uuidV7(), ...std(r), company_id: co, summary: orNull(web.summary ?? r.summary ?? r.text),
+      sources: Array.isArray(web.sources) ? web.sources : Array.isArray(r.sources) ? r.sources : [],
       ai_drafted: true, extra: extraOf(r, ["companyId", "summary", "text", "sources"]) });
+  }
+
+  // ---------- hiring scan: featured openings and watch list ----------
+  const featured: Row[] = [];
+  const feat = config.get("featured") as (ArtifactRecord & { items?: Row[]; runAt?: string }) | undefined;
+  for (const [i, f] of (feat?.items ?? []).entries()) {
+    const co = companyId.get(str(f.companyId));
+    if (!co) { reject("config/featured", `item:${i}`, "Company not found"); continue; }
+    const first = dateOrNull(f.firstSeen), last = dateOrNull(f.lastSeen) ?? first;
+    if (!first || !last) { reject("config/featured", `item:${i}`, "No valid dates"); continue; }
+    featured.push({ id: uuidV7(), legacy_id: `featured:${str(f.companyId)}`, company_id: co, first_seen: first, last_seen: last < first ? first : last,
+      jobs: Array.isArray(f.jobs) ? f.jobs : [], scan_run_at: tsOrNull(feat?.runAt) });
+  }
+  const watch: Row[] = [];
+  const w = config.get("watch") as (ArtifactRecord & { orgs?: Row[] }) | undefined;
+  for (const [i, o] of (w?.orgs ?? []).entries()) {
+    if (!str(o.n) && !str(o.o)) { reject("config/watch", `org:${i}`, "No name or Apollo id"); continue; }
+    watch.push({ id: uuidV7(), legacy_id: `watch:${i}`, company_id: companyId.get(str(o.c)) ?? null, name: str(o.n) || str(o.o), apollo_org_id: orNull(o.o) });
+  }
+  const team = config.get("team") as (ArtifactRecord & { emails?: Record<string, string> }) | undefined;
+  for (const [name, email] of Object.entries(team?.emails ?? {})) {
+    if (!userByTeam.has(name)) adjust("config/team", name, `Team member ${name} (${email}) is not in the people mapping; add them to load their records with an author`);
   }
 
   // ---------- config tables ----------
@@ -346,10 +409,10 @@ export function transformExport(x: ArtifactExport, opts: TransformOptions): Tran
   for (const d of deals) dealsPerStage[str(d.stage)] = (dealsPerStage[str(d.stage)] ?? 0) + 1;
   const sentProps = proposals.filter(p => p.status === "Sent");
   const tables: [string, Row[]][] = [
-    ["users", users], ["role_assignments", roleRows], ["platforms", platforms], ["companies", companies], ["contacts", contacts], ["deals", deals],
+    ["users", users], ["role_assignments", roleRows], ["platforms", platforms], ["company_groups", groups], ["companies", companies], ["contacts", contacts], ["deals", deals],
     ["activities", activities], ["tasks", tasks], ["outreach_steps", outreach], ["proposals", proposals], ["proposal_versions", versions],
     ["clients", clients], ["partners", partners], ["referrals", referrals], ["triggers", triggers], ["proof_assets", proof], ["reviews", reviews],
-    ["research", research], ...cfgRows, ["audit_log", auditRows]
+    ["research", research], ["featured_openings", featured], ["hiring_watch", watch], ...cfgRows, ["audit_log", auditRows]
   ];
   const inCounts: Record<string, number> = {};
   for (const [k, v] of Object.entries(x.collections)) inCounts[k] = v?.length ?? 0;
