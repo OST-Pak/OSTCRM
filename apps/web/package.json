@@ -1,0 +1,30 @@
+{
+  "name": "@ostcrm/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:e2e": "vite build --mode e2e --outDir dist-e2e",
+    "test": "vitest run",
+    "e2e": "node e2e/run.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "3.28.1",
+    "@ostcrm/domain": "workspace:*",
+    "@tanstack/react-query": "5.62.8",
+    "@tanstack/react-router": "1.89.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.1.0",
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5",
+    "@vitejs/plugin-react": "4.3.4",
+    "jsdom": "25.0.1",
+    "vite": "5.4.21"
+  }
+}
