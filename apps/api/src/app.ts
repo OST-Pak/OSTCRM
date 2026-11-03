@@ -74,11 +74,8 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     if (!m) throw new ApiError(401, "unauthenticated", "Sign in with Microsoft to continue");
     let oid: string;
     try { oid = (await verifyToken(m[1]!, opts.auth)).oid; } catch { throw new ApiError(401, "unauthenticated", "Your sign-in is not valid or has expired"); }
-    // Look up the person and their live role as the system role (people cannot read others' roles).
-    const who = await inTx(ctxOf(req, "system", null), db => db.query<{ id: string; name: string; role: Role | null; disabled: boolean }>(
-      `SELECT u.id, u.display_name AS name, r.role, (u.disabled_at IS NOT NULL OR u.archived_at IS NOT NULL) AS disabled
-         FROM users u LEFT JOIN role_assignments r ON r.user_id = u.id AND r.archived_at IS NULL
-        WHERE u.entra_oid = $1`, [oid]));
+    // Look up the person and their live role. The database decides the role on every query anyway.
+    const who = await opts.pool.query<{ id: string; name: string; role: Role | null; disabled: boolean }>("SELECT * FROM app.resolve_user($1)", [oid]);
     const u = who.rows[0];
     if (!u || u.disabled || !u.role) throw new ApiError(403, "no_access", "You do not have access to the CRM. Ask Saad to add you.");
     req.user = { id: u.id, role: u.role, name: u.name };
@@ -98,7 +95,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     if (!e) {
       req.log.error({ err, route: req.routeOptions.url, userId: req.user?.id }, "unhandled error");
       // Errors are stored with the request id, not just printed (closes known issue 7).
-      await inTx(ctxOf(req, "system", req.user?.id ?? null), db => db.query(
+      await inTx(ctxOf(req, req.user?.role ?? "read_only", req.user?.id ?? null), db => db.query(
         "INSERT INTO errors (source, request_id, user_id, route, message, stack) VALUES ('server', $1, $2, $3, $4, $5)",
         [String(req.id), req.user?.id ?? null, req.routeOptions.url ?? req.url, String((err as Error).message).slice(0, 2000), String((err as Error).stack ?? "").slice(0, 8000)]
       )).catch(x => req.log.error({ err: x }, "could not store error"));

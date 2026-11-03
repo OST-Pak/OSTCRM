@@ -22,10 +22,15 @@ DATABASE_URL=... pnpm --filter @ostcrm/db migrate down --steps 1
 | 0004 system | audit_log with a trigger on every business table, ai_runs, errors, outbox, idempotency_keys |
 | 0005 rls | Grants to `app_user` and row-level security per role |
 | 0006 proposal template | The proposal template as effective-dated config |
+| 0007 hardening | Fixes from the independent security review (see below) |
 
 ## How access is enforced in the database
 
-The API connects as a member of `app_user` (never the table owner) and, inside each transaction, calls `setRequestContext` with the person's id and role. Policies then decide what each role can read and change. The API's permission checks come first; these policies are the second layer.
+The API connects as a member of `app_user` (never the table owner) and, inside each transaction, calls `setRequestContext` with the person's id. **The database does not trust the role the API sends:** `app.current_role()` looks the role up in `role_assignments` and returns nothing for a disabled or unknown person. `system` is honoured only for the worker's own login, which must be a member of `app_worker`. Policies then decide what each role can read and change. The API's permission checks come first; these policies are the second layer.
+
+Authors (`created_by`, `updated_by`) are stamped by the database for every app session, and the audit actor type is derived from the session, so neither can be forged.
+
+**Remaining risk, by design:** anyone holding the API's database credential can set `app.user_id` to any person's id and act as them. Row-level security cannot defend against a stolen application credential. The controls for that are in infrastructure (Engineer A and B): managed identity instead of a password, the database on a private endpoint only, no standing human access, and alerts on unusual queries.
 
 | Role | Reads | Changes |
 |---|---|---|

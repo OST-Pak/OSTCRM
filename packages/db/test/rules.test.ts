@@ -172,9 +172,10 @@ describe("row-level security", () => {
     });
   });
 
-  it("an activity cannot be logged in someone else's name", async () => {
+  it("an activity cannot be logged in someone else's name: the database stamps the real author", async () => {
     await as(t.app, P.bd_support, "bd_support", async db => {
-      expect(await attempt(db, "INSERT INTO activities (company_id, type, occurred_on, created_by) VALUES ($1, 'Call', '2026-11-10', $2)", [companyId, P.owner])).toBe("42501");
+      const r = await db.query("INSERT INTO activities (company_id, type, occurred_on, created_by) VALUES ($1, 'Call', '2026-11-10', $2) RETURNING created_by", [companyId, P.owner]);
+      expect(r.rows[0].created_by).toBe(P.bd_support);
     });
   });
 
@@ -232,7 +233,7 @@ describe("row-level security", () => {
       expect(await attempt(db, "INSERT INTO outbox (topic, payload) VALUES ('deal.moved', '{}')")).toBe("ok");
       expect((await db.query("SELECT count(*)::int AS n FROM outbox")).rows[0].n).toBe(0);
     });
-    await as(t.app, null, "system", async db => {
+    await as(t.worker, null, "system", async db => {
       await db.query("INSERT INTO outbox (topic, payload) VALUES ('deal.moved', '{}')");
       expect((await db.query("UPDATE outbox SET published_at = now() WHERE published_at IS NULL")).rowCount).toBeGreaterThan(0);
     });

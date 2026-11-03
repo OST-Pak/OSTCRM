@@ -48,7 +48,7 @@ describe("sign-in", () => {
   it("refuses tokens from another tenant, for another audience, expired, or signed with another key", async () => {
     const oid = T.people.owner.oid;
     for (const o of [{ tid: "22222222-2222-4222-8222-222222222222" }, { aud: "api://someone-else" }, { exp: "-10m" }, { wrongKey: true },
-      { iss: "https://evil.example/v2.0" }]) {
+      { iss: "https://evil.example/v2.0" }, { idToken: true }]) {
       const r = await T.app.inject({ url: "/v1/me", headers: { authorization: `Bearer ${await T.entra.token(oid, o)}` } });
       expect([JSON.stringify(o), r.statusCode]).toEqual([JSON.stringify(o), 401]);
     }
@@ -210,6 +210,14 @@ describe("commands", () => {
   });
 });
 
+describe("duplicates", () => {
+  it("a duplicate key returns 409 without naming the constraint", async () => {
+    const { fromPg } = await import("../src/errors.js");
+    const e = fromPg({ code: "23505", constraint: "companies_domain_uq" })!;
+    expect([e.status, e.details]).toEqual([409, undefined]);
+  });
+});
+
 describe("exports and errors", () => {
   it("bulk export is logged and alerts the owner, and neutralizes spreadsheet formulas", async () => {
     await T.db.owner.query("INSERT INTO companies (name, name_normalized) VALUES ('=HYPERLINK(\"x\")', 'zzz formula')");
@@ -217,6 +225,8 @@ describe("exports and errors", () => {
     expect(r.headers["content-type"]).toContain("text/csv");
     expect(r.body.split("\r\n")[0]).toBe("name,domain,type,state,platform,owner,stage,next_step_on");
     expect(r.body).toContain(`"'=HYPERLINK(""x"")"`);
+    await T.db.owner.query("INSERT INTO companies (name, name_normalized) VALUES (E'\\tcmd', 'zzz tab')");
+    expect((await T.app.inject({ url: "/v1/exports/companies.csv", headers: await T.auth("admin") })).body).toContain(`"'\tcmd"`);
     expect((await T.db.owner.query("SELECT count(*)::int AS n FROM audit_log WHERE action = 'export'")).rows[0].n).toBeGreaterThan(0);
     expect((await T.db.owner.query("SELECT count(*)::int AS n FROM outbox WHERE topic = 'alert.bulk_export'")).rows[0].n).toBeGreaterThan(0);
   });
@@ -224,7 +234,7 @@ describe("exports and errors", () => {
   it("client errors are stored with the request id; error responses carry it too", async () => {
     const h = await T.auth("read_only");
     expect((await T.app.inject({ method: "POST", url: "/v1/errors", headers: h, payload: { message: "Board failed to render", route: "/pipeline", requestId: "req-abc-123" } })).statusCode).toBe(204);
-    expect((await T.db.owner.query("SELECT count(*)::int AS n FROM errors WHERE request_id = 'req-abc-123' AND source = 'client'")).rows[0].n).toBe(1);
+    expect((await T.db.owner.query("SELECT count(*)::int AS n FROM errors WHERE context->>'clientRequestId' = 'req-abc-123' AND source = 'client' AND request_id <> 'req-abc-123'")).rows[0].n).toBe(1);
     const bad = await T.app.inject({ url: `/v1/companies/not-a-uuid`, headers: h });
     expect(bad.statusCode).toBe(400);
     expect(bad.json().requestId).toBeTruthy();

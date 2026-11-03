@@ -4,7 +4,12 @@ import { idempotent } from "../app.js";
 import { ApiError, badRequest, notFound } from "../errors.js";
 
 const uuid = z.string().uuid();
-const csv = (v: unknown) => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) || /^[=+\-@]/.test(s) ? `"${s.replace(/^([=+\-@])/, "'$1").replace(/"/g, '""')}"` : s; };
+/** CSV cell. Cells that a spreadsheet would run as a formula (=, +, -, @, tab, carriage return) are prefixed with a quote. */
+const csv = (v: unknown) => {
+  let s = v == null ? "" : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[",\n\r\t']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
 
 export async function adminRoutes(app: FastifyInstance) {
   app.get("/health", { config: { action: "public" } }, async () => ({ ok: true }));
@@ -64,8 +69,9 @@ export async function adminRoutes(app: FastifyInstance) {
     const b = z.object({ message: z.string().min(1).max(2000), stack: z.string().max(8000).optional(), route: z.string().max(300).optional(),
       requestId: z.string().max(64).optional(), context: z.record(z.unknown()).optional() }).strict().parse(req.body);
     if (JSON.stringify(b.context ?? {}).length > 4000) throw new ApiError(413, "too_large", "Error context is too large");
+    // The stored request id is always ours; the one the browser reports is kept as context.
     await req.tx(db => db.query("INSERT INTO errors (source, request_id, user_id, route, message, stack, context) VALUES ('client', $1, $2, $3, $4, $5, $6)",
-      [b.requestId ?? String(req.id), req.user!.id, b.route ?? null, b.message, b.stack ?? null, JSON.stringify(b.context ?? {})]));
+      [String(req.id), req.user!.id, b.route ?? null, b.message, b.stack ?? null, JSON.stringify({ ...(b.context ?? {}), clientRequestId: b.requestId ?? null })]));
     reply.status(204);
   });
 }
