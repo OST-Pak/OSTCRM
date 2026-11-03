@@ -4,6 +4,9 @@ Choices that change behaviour, newest first. Each entry: date, decision, who dec
 
 | Date | Decision | Decided by | Why |
 |---|---|---|---|
+| 2026-11-02 | Queries use parameterized SQL through `pg`, not Drizzle, for now. | Claude | Fewer moving parts while row-level security and transaction context are being proven. Revisit when the number of queries grows. |
+| 2026-11-02 | Specialists can move and edit deals assigned to them but cannot edit company records. The API returns 403 for both cases; the database blocks them as a second layer. | Claude | The brief's role table gives Specialists activity logging, tasks and viewing proposals, plus row-scoped deal edits. |
+| 2026-11-02 | The brief's `proposal.send` permission is `proposal.markSent`. | Saad | Proposals are sent outside the CRM. |
 | 2026-11-02 | A company gets a `deals` row at migration if it is past Target or has seats or a next step. Duplicates do not get their own deal. | Claude | The artifact kept the deal on the company; Target-only prospects have no deal yet. |
 | 2026-11-02 | The migration loads with all triggers on, so every loaded record gets an audit row marked "artifact migration". | Claude | Keeps foreign keys enforced and gives every record a provenance entry. |
 | 2026-11-02 | Staging dry runs use an export masked with `migrate-artifact mask` (names, contact details and free text replaced; audit trail removed). | Claude | Default for open decision 11. |
