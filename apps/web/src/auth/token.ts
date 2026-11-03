@@ -55,7 +55,40 @@ async function msalAuth(): Promise<Auth> {
   };
 }
 
+/**
+ * Local preview (`vite --mode localpreview`): pick a person (demo roles, or your team when your export is loaded). The local API signs a token for it with a key it
+ * makes at startup. Compiled out of production builds, like the e2e path.
+ */
+async function localAuth(): Promise<Auth> {
+  const KEY = "crm.localToken";
+  let token: string | null = null;
+  try { token = sessionStorage.getItem(KEY); } catch { /* storage blocked */ }
+  if (!token) {
+    const res = await fetch("/local/sign-in");
+    if (!res.ok) throw new Error("The local API is not running");
+    const choices = (await res.json()) as { label: string; token: string }[];
+    token = await new Promise<string>(resolve => {
+      const root = document.getElementById("root")!;
+      root.innerHTML = `<main class="wrap"><section class="panel" style="margin-top:24px;max-width:520px">
+        <h2>Local preview</h2><p class="muted">On this computer only. Choose who to sign in as.</p><div class="choices"></div></section></main>`;
+      const box = root.querySelector(".choices")!;
+      for (const c of choices) {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = c.label;
+        b.onclick = () => resolve(c.token);
+        box.appendChild(b);
+      }
+    });
+    try { sessionStorage.setItem(KEY, token); } catch { /* storage blocked */ }
+  }
+  return {
+    async getToken() { return token!; },
+    async signOut() { try { sessionStorage.removeItem(KEY); } catch { /* storage blocked */ } location.assign("/"); }
+  };
+}
+
 export async function createAuth(): Promise<Auth> {
   if (import.meta.env.MODE === "e2e") return e2eAuth();
+  if (import.meta.env.MODE === "localpreview") return localAuth();
   return msalAuth();
 }

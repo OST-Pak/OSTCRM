@@ -1,0 +1,32 @@
+# Local preview: the CRM on your own computer, with demo data or your own export (see LOCAL.md). Not for staging or production.
+#   docker compose -f docker-compose.local.yml up --build
+# then open http://localhost:5173
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: local
+    volumes:
+      - ostcrm-local-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    environment:
+      ADMIN_DATABASE_URL: postgres://postgres:local@db:5432/postgres
+      LOCAL_DATA_DIR: /data
+    volumes:
+      # Put the file from "Export all data" here to see your real CRM. It never goes into the image or git.
+      - ./local-data:/data
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  ostcrm-local-db:

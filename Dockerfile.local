@@ -1,0 +1,8 @@
+# Local preview image: API and web dev server in one container. Not used for staging or production.
+FROM node:22-slim
+RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
+WORKDIR /repo
+COPY . .
+RUN pnpm install --frozen-lockfile
+EXPOSE 5173
+CMD ["sh", "-c", "pnpm --filter @ostcrm/api local & sleep 4 && pnpm --filter @ostcrm/web local"]

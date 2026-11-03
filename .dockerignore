@@ -1,0 +1,7 @@
+**/node_modules
+**/dist
+**/dist-e2e
+**/e2e/out
+.git
+oak-street-crm-export-*.json
+local-data/

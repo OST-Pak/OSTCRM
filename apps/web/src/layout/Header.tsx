@@ -8,7 +8,7 @@ const ROLE_LABEL = { owner: "Owner", admin: "Admin", bd_support: "BD support", s
 
 /** Header with the mega menu, as in the artifact: three groups, each item with a one-line description. */
 export function Header({ current }: { current: ViewId | null }) {
-  const { me } = useApp();
+  const { me, signOut } = useApp();
   const [open, setOpen] = useState<string | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const header = useRef<HTMLElement>(null);
@@ -53,6 +53,7 @@ export function Header({ current }: { current: ViewId | null }) {
           <div className="me">
             <span><span className="me-l">Signed in as </span><b>{me.name}</b> <span className="small muted">{ROLE_LABEL[me.role]}</span></span>
             <ThemeButton />
+            {import.meta.env.MODE === "localpreview" && <button type="button" className="linkbtn" onClick={signOut}>Switch person</button>}
           </div>
         </div>
       </header>
