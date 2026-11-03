@@ -246,3 +246,26 @@ describe("exports and errors", () => {
     expect(r.json().items).toHaveLength(5);
   });
 });
+
+describe("prospects", () => {
+  it("returns every company with a tier, filters and pages", async () => {
+    await T.db.owner.query("UPDATE companies SET type = 'PEO', platform_name = 'PrismHR', size = 'Large', state = 'TX' WHERE id = $1", [acme.id]);
+    const r = await T.app.inject({ url: "/v1/prospects?limit=10", headers: await T.auth("read_only") });
+    expect(r.statusCode).toBe(200);
+    const b = r.json();
+    expect(b.total).toBeGreaterThanOrEqual(121);
+    expect(b.items).toHaveLength(10);
+    expect(b.items[0].name).toBe("Acme PEO");
+    expect(b.items[0].tier).toBe("A");
+    expect(b.items[0].why).toContain("Platform PrismHR +3");
+    expect(b.facets.states).toContain("TX");
+    const f = (await T.app.inject({ url: "/v1/prospects?q=acme&state=TX", headers: await T.auth("specialist") })).json();
+    expect(f.items.map((x: { name: string }) => x.name)).toEqual(["Acme PEO"]);
+    const p2 = (await T.app.inject({ url: "/v1/prospects?sort=name&offset=10&limit=5", headers: await T.auth("owner") })).json();
+    expect(p2.offset).toBe(10);
+    expect(p2.items).toHaveLength(5);
+  });
+  it("needs a sign-in", async () => {
+    expect((await T.app.inject({ url: "/v1/prospects" })).statusCode).toBe(401);
+  });
+});
