@@ -17,9 +17,9 @@ const urlFor = (db: string, user?: string) => {
   return u.toString();
 };
 
-export interface TestDb { name: string; owner: pg.Client; app: pg.Client; drop(): Promise<void> }
+export interface TestDb { name: string; owner: pg.Client; app: pg.Client; worker: pg.Client; drop(): Promise<void> }
 
-/** A fresh database with all migrations applied. `owner` bypasses RLS; `app` connects as a member of app_user. */
+/** A fresh database with all migrations applied. `owner` bypasses RLS; `app` connects as the API would (app_user); `worker` as the background worker (app_worker). */
 export async function freshDb(opts: { migrate?: boolean } = {}): Promise<TestDb> {
   const name = "ostcrm_test_" + randomBytes(5).toString("hex");
   const admin = new pg.Client({ connectionString: ADMIN_URL });
@@ -27,8 +27,12 @@ export async function freshDb(opts: { migrate?: boolean } = {}): Promise<TestDb>
   await admin.query(`CREATE DATABASE ${name}`);
   await admin.query(`DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN CREATE ROLE app_user NOLOGIN; END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_worker') THEN CREATE ROLE app_worker NOLOGIN IN ROLE app_user; END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ostcrm_test_app') THEN
       CREATE ROLE ostcrm_test_app LOGIN PASSWORD 'test-only' IN ROLE app_user;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ostcrm_test_worker') THEN
+      CREATE ROLE ostcrm_test_worker LOGIN PASSWORD 'test-only' IN ROLE app_worker;
     END IF; END $$`);
   await admin.end();
   const owner = new pg.Client({ connectionString: urlFor(name) });
@@ -36,10 +40,12 @@ export async function freshDb(opts: { migrate?: boolean } = {}): Promise<TestDb>
   if (opts.migrate !== false) await migrateUp(owner);
   const app = new pg.Client({ connectionString: urlFor(name, "ostcrm_test_app") });
   await app.connect();
+  const worker = new pg.Client({ connectionString: urlFor(name, "ostcrm_test_worker") });
+  await worker.connect();
   return {
-    name, owner, app,
+    name, owner, app, worker,
     async drop() {
-      await app.end(); await owner.end();
+      await app.end(); await worker.end(); await owner.end();
       const a = new pg.Client({ connectionString: ADMIN_URL });
       await a.connect();
       await a.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);

@@ -5,19 +5,30 @@ export interface AuthConfig {
   tenantId: string;
   /** The API's application id URI or client id, as it appears in the token's `aud`. */
   audience: string;
-  /** Key source. Production: the tenant's JWKS endpoint. Tests: a local key set. */
+  /** Delegated scope the web app requests for this API (an ID token has none, so it is refused). */
+  requiredScope?: string;
+  /** Key source. Production: the tenant's JWKS endpoint (cached). Tests: a local key set. */
   keys?: JWTVerifyGetKey;
 }
 
 export interface VerifiedToken { oid: string; tid: string; name?: string; email?: string }
 
+const keySets = new Map<string, JWTVerifyGetKey>();
+
+/** The tenant's signing keys, fetched once and cached (jose refreshes on an unknown key id, with a cooldown). */
 export function entraKeys(tenantId: string): JWTVerifyGetKey {
-  return createRemoteJWKSet(new URL(`https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`));
+  let k = keySets.get(tenantId);
+  if (!k) {
+    k = createRemoteJWKSet(new URL(`https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`), { cooldownDuration: 30_000, cacheMaxAge: 3_600_000 });
+    keySets.set(tenantId, k);
+  }
+  return k;
 }
 
 /**
- * Verifies a Microsoft Entra ID v2 access token: signature (RS256), issuer for our tenant, audience,
- * expiry with 60 seconds of clock skew, and the tenant claim. Identity comes only from the token,
+ * Verifies a Microsoft Entra ID v2 access token: signature (RS256), issuer for our tenant, audience
+ * (use the App ID URI), expiry with 60 seconds of clock skew, the tenant claim, token version and the
+ * delegated scope, so an ID token for the same app is refused. Identity comes only from the token,
  * never from anything the caller types (closes known issue 4).
  */
 export async function verifyToken(token: string, cfg: AuthConfig): Promise<VerifiedToken> {
@@ -29,6 +40,10 @@ export async function verifyToken(token: string, cfg: AuthConfig): Promise<Verif
     requiredClaims: ["oid", "tid", "exp"]
   });
   if (payload.tid !== cfg.tenantId) throw new Error("wrong tenant");
+  // Only access tokens for this API: they carry delegated scopes; ID tokens do not.
+  const scopes = typeof payload.scp === "string" ? payload.scp.split(" ") : [];
+  if (!scopes.includes(cfg.requiredScope ?? "access_as_user")) throw new Error("missing scope");
+  if (payload.ver !== "2.0") throw new Error("not a v2 token");
   return {
     oid: String(payload.oid),
     tid: String(payload.tid),

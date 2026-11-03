@@ -4,6 +4,9 @@ Choices that change behaviour, newest first. Each entry: date, decision, who dec
 
 | Date | Decision | Decided by | Why |
 |---|---|---|---|
+| 2026-11-02 | The database looks up each person's role itself and ignores the role the caller claims. The worker gets the `system` role only through its own login in `app_worker`. | Claude | Independent security review: a caller could otherwise claim any role. |
+| 2026-11-02 | Admins cannot change sign-in identities or touch the owner's account. Specialists cannot create deals, move a deal to another company, or log stage events or deal activities on others' deals. | Claude | Independent security review findings 1 and 2. |
+| 2026-11-02 | The API accepts only Entra v2 access tokens carrying the `access_as_user` scope; ID tokens are refused. Engineer A sets the audience to the App ID URI. | Claude | Independent security review finding 8. |
 | 2026-11-02 | Queries use parameterized SQL through `pg`, not Drizzle, for now. | Claude | Fewer moving parts while row-level security and transaction context are being proven. Revisit when the number of queries grows. |
 | 2026-11-02 | Specialists can move and edit deals assigned to them but cannot edit company records. The API returns 403 for both cases; the database blocks them as a second layer. | Claude | The brief's role table gives Specialists activity logging, tasks and viewing proposals, plus row-scoped deal edits. |
 | 2026-11-02 | The brief's `proposal.send` permission is `proposal.markSent`. | Saad | Proposals are sent outside the CRM. |

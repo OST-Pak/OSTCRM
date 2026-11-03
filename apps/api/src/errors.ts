@@ -12,7 +12,7 @@ export const badRequest = (message: string, details?: unknown) => new ApiError(4
 export function fromPg(e: unknown): ApiError | null {
   const code = (e as { code?: string }).code;
   if (code === "42501") return new ApiError(403, "forbidden", "Not allowed");
-  if (code === "23505") return new ApiError(409, "duplicate", "A record with the same key already exists", { constraint: (e as { constraint?: string }).constraint });
+  if (code === "23505") return new ApiError(409, "duplicate", "A record with the same key already exists");
   if (code === "23503") return badRequest("A linked record does not exist");
   if (code === "23514" || code === "22P02" || code === "22007") return badRequest("A value is not valid");
   return null;
