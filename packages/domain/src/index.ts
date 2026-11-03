@@ -9,3 +9,4 @@ export * from "./forecast.js";
 export * from "./cadence.js";
 export * from "./accounts.js";
 export * from "./proposal.js";
+export * from "./registry.js";
